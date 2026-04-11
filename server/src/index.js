@@ -3,26 +3,40 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const connectDB = require('./src/config/database');
-const authRoutes = require('./src/routes/auth');
-const userRoutes = require('./src/routes/users');
-const policyRoutes = require('./src/routes/policies');
-const claimRoutes = require('./src/routes/claims');
-const paymentRoutes = require('./src/routes/payments');
-const { errorHandler } = require('./src/middleware/errorHandler');
+const connectDB = require('./config/database');
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
+const policyRoutes = require('./routes/policies');
+const claimRoutes = require('./routes/claims');
+const paymentRoutes = require('./routes/payments');
+const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5003;
 
 // Connect to MongoDB
 connectDB();
 
 // Security middleware
 app.use(helmet());
-app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+
+// CORS configuration - allow all localhost ports in development
+const corsOptions = {
   credentials: true
-}));
+};
+
+if (process.env.NODE_ENV === 'production') {
+  corsOptions.origin = process.env.CLIENT_URL;
+} else {
+  // In development, allow all localhost origins
+  corsOptions.origin = function (origin, callback) {
+    const allowedHosts = ['localhost', '127.0.0.1'];
+    const isAllowed = !origin || allowedHosts.some(host => origin.includes(host));
+    callback(null, isAllowed);
+  };
+}
+
+app.use(cors(corsOptions));
 
 // Rate limiting
 const limiter = rateLimit({
