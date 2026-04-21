@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-export default function ServiceCard({ icon, title, description, color = "navy", delay = 0 }) {
+export default function ServiceCard({ icon, title, description, color = "navy", delay = 0, to = "/services" }) {
   const colorMap = {
     navy:  { bg: "bg-navy-50",  icon: "text-navy-600",  border: "border-navy-100",  hover: "hover:border-navy-300" },
     gold:  { bg: "bg-gold-50",  icon: "text-gold-600",  border: "border-gold-100",  hover: "hover:border-gold-400" },
@@ -18,7 +18,7 @@ export default function ServiceCard({ icon, title, description, color = "navy", 
       </div>
       <h3 className="font-display text-lg font-semibold text-navy-900 mb-2 group-hover:text-navy-700 transition-colors">{title}</h3>
       <p className="font-sans text-sm text-gray-500 leading-relaxed mb-4">{description}</p>
-      <Link to="/services" className={`font-sans text-sm font-semibold ${c.icon} flex items-center gap-1.5 group-hover:gap-3 transition-all duration-300`}>
+      <Link to={to} className={`font-sans text-sm font-semibold ${c.icon} flex items-center gap-1.5 group-hover:gap-3 transition-all duration-300`}>
         Learn More
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />

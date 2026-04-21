@@ -12,10 +12,10 @@ const NIGERIAN_STATES = [
 ];
 
 const KYC_DOCS = [
-  { id: "id_card",         label: "National ID Card",    icon: "🪪", desc: "NIN slip or laminated ID card" },
-  { id: "passport",        label: "International Passport", icon: "📘", desc: "Bio-data page clearly visible" },
-  { id: "utility_bill",   label: "Utility Bill",        icon: "🧾", desc: "Not older than 3 months" },
-  { id: "bank_statement", label: "Bank Statement",      icon: "🏦", desc: "Last 3 months, stamped" },
+  { id: "id_card",         label: "National ID Card",       icon: "🪪", desc: "NIN slip or laminated ID card", accept: "image/jpeg,image/png",            required: true  },
+  { id: "passport",        label: "International Passport", icon: "📘", desc: "Bio-data page clearly visible", accept: "image/jpeg,image/png",            required: false },
+  { id: "utility_bill",    label: "Utility Bill",           icon: "🧾", desc: "Not older than 3 months",       accept: "image/jpeg,image/png,application/pdf", required: true  },
+  { id: "bank_statement",  label: "Bank Statement",         icon: "🏦", desc: "Last 3 months, PDF preferred",  accept: "application/pdf,image/jpeg,image/png",  required: false },
 ];
 
 const TABS = ["Personal Info", "Address", "KYC Documents", "Security"];
@@ -57,6 +57,7 @@ export default function ProfilePage() {
   // KYC uploads (mock — stores file names)
   const [kycUploads, setKycUploads] = useState({});
   const [kycSuccess, setKycSuccess] = useState("");
+  const [nin,        setNin]        = useState("");
 
   const handlePersonalChange = (e) =>
     setPersonal((p) => ({ ...p, [e.target.name]: e.target.value }));
@@ -125,21 +126,78 @@ export default function ProfilePage() {
     }
   };
 
+  // MIN sizes to reject screenshots/thumbnails
+  const MIN_FILE_SIZE = 50 * 1024; // 50KB
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+  const ALLOWED_FOR_ID = ['image/jpeg', 'image/jpg', 'image/png'];
+
+  const [kycFiles, setKycFiles] = useState({}); // stores File objects
+
   const handleFileUpload = (docId, file) => {
     if (!file) return;
+
+    // File type check
+    const isIdDoc = ['id_card', 'passport', 'drivers_licence', 'voters_card'].includes(docId);
+    const allowed = isIdDoc ? ALLOWED_FOR_ID : ALLOWED_TYPES;
+
+    if (!allowed.includes(file.type)) {
+      showFeedback(
+        isIdDoc
+          ? `${file.name}: ID documents must be JPG or PNG images.`
+          : `${file.name}: Only JPG, PNG, or PDF files accepted.`,
+        true
+      );
+      return;
+    }
+
+    // Size checks
+    if (file.size < MIN_FILE_SIZE) {
+      showFeedback(
+        `${file.name} is too small (${Math.round(file.size/1024)}KB). Please upload a clear, full-resolution photo — not a screenshot or thumbnail. Minimum size: 50KB.`,
+        true
+      );
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      showFeedback(`${file.name} is too large. Maximum file size is 5MB.`, true);
+      return;
+    }
+
     setKycUploads((p) => ({ ...p, [docId]: file.name }));
+    setKycFiles((p) => ({ ...p, [docId]: file }));
   };
 
   const submitKYC = async () => {
-    if (Object.keys(kycUploads).length === 0) {
+    if (Object.keys(kycFiles).length === 0) {
       showFeedback("Please upload at least one document.", true);
       return;
     }
     setSaving(true);
-    // Simulate upload — replace with real FormData API call when backend ready
-    await new Promise((r) => setTimeout(r, 1500));
-    setKycSuccess("Documents submitted! Our team will verify within 24–48 hours.");
-    setSaving(false);
+    try {
+      // Build document list with metadata
+      const documents = Object.entries(kycFiles).map(([type, file]) => ({
+        type,
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type,
+        url:      'pending_upload',
+      }));
+
+      await apiClient.post("/users/kyc", { documents, nin: nin || undefined });
+      setKycSuccess("Documents submitted! Our compliance team will verify within 24–48 hours. You will be notified by email.");
+      setKycFiles({});
+    } catch (err) {
+      const errors = err.response?.data?.errors;
+      if (errors?.length > 0) {
+        showFeedback(errors.join(' | '), true);
+      } else {
+        showFeedback(err.response?.data?.message || "Failed to submit documents.", true);
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const inputCls = "input-field";
@@ -407,6 +465,28 @@ export default function ProfilePage() {
                     </div>
                   )}
 
+                  {/* NIN / BVN Input */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-2">
+                    <div className="form-group">
+                      <label className="form-label">NIN (National Identification Number)</label>
+                      <input
+                        type="text"
+                        value={nin}
+                        onChange={(e) => setNin(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                        placeholder="11-digit NIN"
+                        maxLength={11}
+                        className="input-field font-mono tracking-widest"
+                      />
+                      <p className="font-sans text-xs text-gray-400 mt-1">Required for identity verification against NIMC database.</p>
+                    </div>
+                    <div className="bg-navy-50 rounded-xl p-4 flex flex-col justify-center">
+                      <p className="font-sans text-xs font-semibold text-navy-800 mb-1">How we verify your identity</p>
+                      <p className="font-sans text-xs text-navy-600 leading-relaxed">
+                        Your NIN is checked against the NIMC database. Documents are reviewed by our compliance team within 24–48 hours. We never share your data with third parties.
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Document Upload Cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {KYC_DOCS.map((doc) => {
@@ -424,15 +504,24 @@ export default function ProfilePage() {
                           <input
                             id={`kyc-${doc.id}`}
                             type="file"
-                            accept="image/*,.pdf"
+                            accept={doc.accept}
                             className="hidden"
-                            onChange={(e) => handleFileUpload(doc.id, e.target.files[0])}
+                            onChange={(e) => {
+                              handleFileUpload(doc.id, e.target.files[0]);
+                              e.target.value = ''; // reset so same file can be re-selected
+                            }}
                           />
                           <div className="flex items-start gap-3">
                             <span className="text-2xl">{doc.icon}</span>
                             <div className="flex-1 min-w-0">
-                              <p className="font-sans font-semibold text-navy-900 text-sm">{doc.label}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-sans font-semibold text-navy-900 text-sm">{doc.label}</p>
+                                {doc.required && (
+                                  <span className="text-[10px] font-sans font-semibold bg-gerror-50 text-gerror-600 border border-gerror-200 px-1.5 py-0.5 rounded-full">Required</span>
+                                )}
+                              </div>
                               <p className="font-sans text-xs text-gray-400 mt-0.5">{doc.desc}</p>
+                              <p className="font-sans text-xs text-gray-400 mt-0.5">Min: 50KB · Max: 5MB · {doc.accept.replace('application/pdf', 'PDF').replace('image/jpeg,image/png', 'JPG/PNG')}</p>
                             </div>
                             {uploaded && (
                               <svg className="w-5 h-5 text-gsuccess-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

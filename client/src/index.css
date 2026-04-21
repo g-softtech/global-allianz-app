@@ -1,115 +1,180 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ── Base ──────────────────────────────────────────────────── */
 @layer base {
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
-    @apply font-sans text-navy-900 bg-white;
+    @apply font-sans bg-white text-warm-900;
     margin: 0;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-  h1, h2, h3, h4 { @apply font-display; }
+
+  h1, h2, h3, h4, h5 { @apply font-display; }
+
   a { @apply transition-colors duration-200; }
+
+  ::selection {
+    background: rgba(212, 175, 55, 0.2);
+    color: #061226;
+  }
 }
 
+/* ── Components ────────────────────────────────────────────── */
 @layer components {
-  /* Buttons */
+
+  /* ── Buttons ── */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-sans font-semibold text-sm tracking-wide transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 cursor-pointer;
+    @apply inline-flex items-center justify-center gap-2
+           font-sans font-medium text-sm tracking-wide
+           rounded-xl transition-all duration-300
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
+           cursor-pointer select-none;
   }
+
+  /* Primary — gold gradient */
   .btn-primary {
-    @apply bg-gold-500 text-navy-900 hover:bg-gold-400 focus:ring-gold-500 shadow-gold hover:shadow-lg hover:-translate-y-0.5;
+    @apply bg-gold-gradient text-navy-900 px-6 py-3
+           shadow-gold hover:shadow-gold-lg
+           hover:-translate-y-px hover:brightness-105
+           focus-visible:ring-gold-500;
   }
+
+  /* Secondary — dark navy */
   .btn-secondary {
-    @apply bg-navy-900 text-white hover:bg-navy-700 focus:ring-navy-500 hover:-translate-y-0.5;
+    @apply bg-navy-900 text-white px-6 py-3
+           hover:bg-navy-800 hover:-translate-y-px
+           focus-visible:ring-navy-500;
   }
+
+  /* Ghost — outlined */
   .btn-outline {
-    @apply border-2 border-gold-500 text-gold-600 hover:bg-gold-500 hover:text-navy-900 focus:ring-gold-500;
+    @apply border border-warm-300 text-warm-700 px-6 py-3 bg-white
+           hover:border-gold-500 hover:text-gold-600
+           focus-visible:ring-gold-500;
   }
+
+  /* White — for dark backgrounds */
   .btn-white {
-    @apply bg-white text-navy-900 hover:bg-navy-50 focus:ring-white shadow-card hover:-translate-y-0.5;
+    @apply bg-white text-navy-900 px-6 py-3
+           shadow-soft hover:shadow-soft-lg hover:-translate-y-px
+           focus-visible:ring-white;
   }
-  .btn:disabled { @apply opacity-50 cursor-not-allowed transform-none; }
 
-  /* Inputs */
+  .btn:disabled { @apply opacity-50 cursor-not-allowed transform-none shadow-none; }
+
+  /* ── Inputs ── */
   .input-field {
-    @apply w-full px-4 py-3 border border-gray-200 rounded-lg font-sans text-navy-900 bg-white
-           focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent
-           placeholder-gray-400 transition-all duration-200;
+    @apply w-full px-4 py-3 bg-white border border-warm-200 rounded-xl
+           font-sans text-warm-900 placeholder-warm-400 text-sm
+           focus:outline-none focus:ring-2 focus:ring-gold-400/50 focus:border-gold-400
+           transition-all duration-200;
   }
-  .input-field:hover { @apply border-gray-300; }
+  .input-field:hover:not(:focus) { @apply border-warm-300; }
 
-  /* Cards */
+  /* ── Cards ── */
   .card {
-    @apply bg-white rounded-2xl shadow-card p-6 transition-all duration-300;
+    @apply bg-white rounded-2xl shadow-card border border-warm-100
+           transition-all duration-300;
   }
   .card-hover {
     @apply card hover:shadow-card-hover hover:-translate-y-1;
   }
-
-  /* Section padding */
-  .section-pad     { @apply py-20 md:py-28; }
-  .section-pad-sm  { @apply py-12 md:py-16; }
-
-  /* Container */
-  .container-custom { @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8; }
-
-  /* Gold divider */
-  .gold-divider { @apply w-16 h-1 bg-gold-500 rounded-full; }
-
-  /* Section label */
-  .section-label {
-    @apply inline-flex items-center gap-2 text-gold-600 font-sans font-semibold text-sm uppercase tracking-widest;
+  .card-gold-hover {
+    @apply card hover:shadow-card-gold hover:-translate-y-1 hover:border-gold-200;
   }
 
-  /* Form */
+  /* ── Layout ── */
+  .container-custom { @apply max-w-6xl mx-auto px-5 sm:px-8 lg:px-10; }
+  .section-pad      { @apply py-20 md:py-28 lg:py-32; }
+  .section-pad-sm   { @apply py-12 md:py-16; }
+
+  /* ── Typography helpers ── */
+  .label-overline {
+    @apply font-sans text-xs font-semibold uppercase tracking-widest2 text-gold-600;
+  }
+  .section-title {
+    @apply font-display text-3xl md:text-4xl font-bold text-navy-900 leading-tight;
+  }
+  .section-body {
+    @apply font-sans text-warm-600 text-base leading-relaxed;
+  }
+
+  /* ── Divider ── */
+  .gold-line {
+    @apply w-10 h-px bg-gold-500;
+  }
+
+  /* ── Form ── */
   .form-group  { @apply flex flex-col gap-1.5; }
-  .form-label  { @apply font-sans font-medium text-sm text-navy-700; }
-  .form-error  { @apply text-gerror-600 text-xs mt-1; }
+  .form-label  { @apply font-sans font-medium text-sm text-warm-700; }
+  .form-error  { @apply font-sans text-xs text-gerror-600 mt-1; }
+
+  /* ── Badges ── */
+  .badge {
+    @apply inline-flex items-center gap-1.5 font-sans text-xs font-semibold
+           px-3 py-1 rounded-full;
+  }
+  .badge-gold  { @apply badge bg-gold-50 text-gold-700 border border-gold-200; }
+  .badge-navy  { @apply badge bg-navy-50 text-navy-700 border border-navy-100; }
+  .badge-green { @apply badge bg-gsuccess-50 text-gsuccess-600 border border-gsuccess-200; }
+  .badge-red   { @apply badge bg-gerror-50 text-gerror-600 border border-gerror-200; }
 }
 
-/* Scroll reveal animations */
+/* ── Scroll reveal ─────────────────────────────────────────── */
 .reveal {
   opacity: 0;
-  transform: translateY(28px);
-  transition: opacity 0.65s ease, transform 0.65s ease;
+  transform: translateY(20px);
+  transition: opacity 0.7s cubic-bezier(0.16,1,0.3,1),
+              transform 0.7s cubic-bezier(0.16,1,0.3,1);
 }
 .reveal.visible { opacity: 1; transform: translateY(0); }
 
 .reveal-left {
   opacity: 0;
-  transform: translateX(-28px);
-  transition: opacity 0.65s ease, transform 0.65s ease;
+  transform: translateX(-24px);
+  transition: opacity 0.7s cubic-bezier(0.16,1,0.3,1),
+              transform 0.7s cubic-bezier(0.16,1,0.3,1);
 }
 .reveal-left.visible { opacity: 1; transform: translateX(0); }
 
 .reveal-right {
   opacity: 0;
-  transform: translateX(28px);
-  transition: opacity 0.65s ease, transform 0.65s ease;
+  transform: translateX(24px);
+  transition: opacity 0.7s cubic-bezier(0.16,1,0.3,1),
+              transform 0.7s cubic-bezier(0.16,1,0.3,1);
 }
 .reveal-right.visible { opacity: 1; transform: translateX(0); }
 
-/* Stagger delays */
 .delay-100 { transition-delay: 0.10s; }
+.delay-150 { transition-delay: 0.15s; }
 .delay-200 { transition-delay: 0.20s; }
 .delay-300 { transition-delay: 0.30s; }
 .delay-400 { transition-delay: 0.40s; }
 .delay-500 { transition-delay: 0.50s; }
 
-/* Hamburger lines */
+/* ── Hamburger ─────────────────────────────────────────────── */
 .hamburger-line {
-  @apply block w-6 h-0.5 bg-white rounded-full transition-all duration-300;
+  @apply block w-5 h-px bg-current rounded-full transition-all duration-300;
 }
 
+/* ── Scrollbar hide ────────────────────────────────────────── */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Root ──────────────────────────────────────────────────── */
 #root {
   width: 100%;
-  max-width: 100%;
-  margin: 0 auto;
   min-height: 100svh;
   display: flex;
   flex-direction: column;

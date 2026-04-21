@@ -1,14 +1,11 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
       colors: {
         navy: {
-          950: "#030B1A",
+          950: "#020810",
           900: "#061226",
           800: "#0A1F3F",
           700: "#0D2B57",
@@ -18,7 +15,7 @@ export default {
           300: "#60A5FA",
           200: "#BAD8FF",
           100: "#DDEEFF",
-          50:  "#EEF6FF",
+          50:  "#F5F8FF",
         },
         gold: {
           700: "#92620A",
@@ -30,6 +27,20 @@ export default {
           100: "#FDF6D6",
           50:  "#FFFDF0",
         },
+        // Warm neutrals — the secret of premium design
+        warm: {
+          950: "#0F0E0C",
+          900: "#1C1A16",
+          800: "#2E2B23",
+          700: "#4A4437",
+          600: "#6B6049",
+          500: "#8C7E63",
+          400: "#B0A080",
+          300: "#D4C9B0",
+          200: "#EAE3D5",
+          100: "#F5F1EA",
+          50:  "#FAF8F4",
+        },
         gsuccess: { 600: "#16A34A", 50: "#F0FDF4", 200: "#BBF7D0" },
         gerror:   { 600: "#DC2626", 50: "#FEF2F2", 200: "#FECACA" },
       },
@@ -37,36 +48,51 @@ export default {
         display: ["'Playfair Display'", "Georgia", "serif"],
         sans:    ["'DM Sans'", "system-ui", "sans-serif"],
       },
-      fontWeight: {
-        300: "300",
-        400: "400",
-        500: "500",
-        600: "600",
-        700: "700",
-        800: "800",
+      fontSize: {
+        "2xs": ["0.625rem", { lineHeight: "1rem" }],
+      },
+      letterSpacing: {
+        widest2: "0.2em",
       },
       animation: {
-        "fade-up":    "fadeUp 0.6s ease-out forwards",
+        "fade-up":    "fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) forwards",
         "fade-in":    "fadeIn 0.5s ease-out forwards",
-        "ken-burns":  "kenBurns 8s ease-in-out infinite alternate",
-        "pulse-soft": "pulseSoft 2s ease-in-out infinite",
+        "ken-burns":  "kenBurns 10s ease-in-out infinite alternate",
+        "pulse-soft": "pulseSoft 3s ease-in-out infinite",
+        "slide-up":   "slideUp 0.6s cubic-bezier(0.16,1,0.3,1) forwards",
       },
       keyframes: {
-        fadeUp:    { "0%": { opacity: 0, transform: "translateY(24px)" }, "100%": { opacity: 1, transform: "translateY(0)" } },
+        fadeUp:    { "0%": { opacity: 0, transform: "translateY(20px)" }, "100%": { opacity: 1, transform: "translateY(0)" } },
         fadeIn:    { "0%": { opacity: 0 }, "100%": { opacity: 1 } },
-        kenBurns:  { "0%": { transform: "scale(1.0)" }, "100%": { transform: "scale(1.08)" } },
-        pulseSoft: { "0%,100%": { opacity: 1 }, "50%": { opacity: 0.7 } },
+        kenBurns:  { "0%": { transform: "scale(1.0)" }, "100%": { transform: "scale(1.06)" } },
+        pulseSoft: { "0%,100%": { opacity: 1 }, "50%": { opacity: 0.6 } },
+        slideUp:   { "0%": { opacity: 0, transform: "translateY(32px)" }, "100%": { opacity: 1, transform: "translateY(0)" } },
       },
       boxShadow: {
-        "gold":       "0 4px 24px -4px rgba(212,175,55,0.35)",
-        "navy":       "0 4px 24px -4px rgba(6,18,38,0.45)",
-        "card":       "0 2px 16px -2px rgba(6,18,38,0.12), 0 1px 4px rgba(0,0,0,0.06)",
-        "card-hover": "0 8px 32px -4px rgba(6,18,38,0.2), 0 2px 8px rgba(0,0,0,0.08)",
+        "gold":        "0 2px 20px -4px rgba(212,175,55,0.4)",
+        "gold-lg":     "0 8px 40px -8px rgba(212,175,55,0.5)",
+        "navy":        "0 4px 24px -4px rgba(6,18,38,0.4)",
+        "card":        "0 1px 3px rgba(0,0,0,0.04), 0 4px 16px -4px rgba(0,0,0,0.06)",
+        "card-hover":  "0 4px 6px rgba(0,0,0,0.04), 0 12px 32px -8px rgba(0,0,0,0.12)",
+        "card-gold":   "0 4px 6px rgba(0,0,0,0.02), 0 12px 32px -8px rgba(212,175,55,0.2)",
+        "soft":        "0 2px 8px rgba(0,0,0,0.06)",
+        "soft-lg":     "0 8px 32px rgba(0,0,0,0.08)",
       },
       backgroundImage: {
-        "gold-gradient": "linear-gradient(135deg, #B8860B 0%, #D4AF37 50%, #E8C84A 100%)",
-        "navy-gradient": "linear-gradient(135deg, #030B1A 0%, #061226 50%, #0A1F3F 100%)",
-        "section-gradient": "linear-gradient(180deg, #F8FAFF 0%, #EEF4FF 100%)",
+        "gold-gradient":    "linear-gradient(135deg, #B8860B 0%, #D4AF37 60%, #E8C84A 100%)",
+        "gold-subtle":      "linear-gradient(135deg, #D4AF37 0%, #E8C84A 100%)",
+        "navy-gradient":    "linear-gradient(160deg, #020810 0%, #061226 50%, #0A1F3F 100%)",
+        "hero-overlay":     "linear-gradient(to right, rgba(2,8,16,0.95) 0%, rgba(6,18,38,0.80) 50%, rgba(10,31,63,0.40) 100%)",
+        "section-warm":     "linear-gradient(180deg, #FFFFFF 0%, #FAF8F4 100%)",
+        "section-warm-rev": "linear-gradient(180deg, #FAF8F4 0%, #FFFFFF 100%)",
+        "card-shine":       "linear-gradient(135deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.05) 100%)",
+      },
+      borderRadius: {
+        "4xl": "2rem",
+        "5xl": "2.5rem",
+      },
+      transitionTimingFunction: {
+        "spring": "cubic-bezier(0.16, 1, 0.3, 1)",
       },
     },
   },

@@ -21,7 +21,14 @@ export default function LoginPage() {
       setAuth(response.data.data);
       navigate("/dashboard");
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed. Please try again.");
+      const status = err.response?.status;
+      if (status === 429) {
+        setError("Too many login attempts. Please wait a few minutes and try again.");
+      } else if (status === 423) {
+        setError(err.response?.data?.message || "Account temporarily locked. Please try again later.");
+      } else {
+        setError(err.response?.data?.message || "Login failed. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }

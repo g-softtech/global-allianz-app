@@ -1,6 +1,7 @@
 // User Types
 export interface User {
-  id: string;
+  _id?: string;
+  id?: string;
   email: string;
   phone: string;
   firstName: string;

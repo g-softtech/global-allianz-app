@@ -3,40 +3,31 @@ const { validationResult } = require('express-validator');
 const User = require('../models/User');
 const { generateOTP, sendOTPEmail } = require('../services/emailService');
 
-// Generate JWT token
-const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE || '7d'
-  });
-};
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCK_TIME_MINUTES  = 15;
 
-// Generate refresh token
-const generateRefreshToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET, {
-    expiresIn: process.env.JWT_REFRESH_EXPIRE || '30d'
+const generateToken = (userId) =>
+  jwt.sign({ userId }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRE || '7d',
   });
-};
 
-// @desc    Register user
-// @route   POST /api/auth/register
-// @access  Public
+const generateRefreshToken = (userId) =>
+  jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET, {
+    expiresIn: process.env.JWT_REFRESH_EXPIRE || '30d',
+  });
+
+// ── Register ──────────────────────────────────────────────────
 const register = async (req, res) => {
   try {
-    // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
+      return res.status(400).json({ success: false, message: 'Validation failed', errors: errors.array() });
     }
 
     const { email, password, firstName, lastName, phone } = req.body;
 
-    // Check if user exists
     const existingUser = await User.findOne({
-      $or: [{ email: email.toLowerCase() }, { phone }]
+      $or: [{ email: email.toLowerCase() }, { phone }],
     });
 
     if (existingUser) {
@@ -44,117 +35,111 @@ const register = async (req, res) => {
         success: false,
         message: existingUser.email === email.toLowerCase()
           ? 'Email already registered'
-          : 'Phone number already registered'
+          : 'Phone number already registered',
       });
     }
 
-    // Create user
     const user = await User.create({
       email: email.toLowerCase(),
-      password,
-      firstName,
-      lastName,
-      phone
+      password, firstName, lastName, phone,
     });
 
-    // Generate OTP for email verification
+    // Generate & send OTP
     const otp = generateOTP();
-    user.otp = {
-      code: otp,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
-    };
+    user.otp = { code: otp, expiresAt: new Date(Date.now() + 10 * 60 * 1000) };
     await user.save();
 
-    // Send OTP email
-    try {
-      await sendOTPEmail(user.email, otp);
-    } catch (emailError) {
-      console.error('Email sending failed:', emailError);
-      // Don't fail registration if email fails
+    try { await sendOTPEmail(user.email, otp); } catch (e) {
+      console.error('OTP email failed:', e.message);
     }
 
-    // Generate tokens
-    const token = generateToken(user._id);
+    const token        = generateToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
-
-    // Save refresh token
     user.refreshTokens.push({ token: refreshToken });
     await user.save();
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful. Please check your email for OTP verification.',
+      message: 'Registration successful. Please verify your email.',
       data: {
         user: {
-          id: user._id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          phone: user.phone,
-          role: user.role,
-          kycVerified: user.kycVerified
+          id: user._id, email: user.email,
+          firstName: user.firstName, lastName: user.lastName,
+          phone: user.phone, role: user.role, kycVerified: user.kycVerified,
         },
-        token,
-        refreshToken
-      }
+        token, refreshToken,
+      },
     });
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Registration failed. Please try again.'
-    });
+    console.error('register error:', error);
+    res.status(500).json({ success: false, message: 'Registration failed. Please try again.' });
   }
 };
 
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
+// ── Login (with brute-force tracking) ─────────────────────────
 const login = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
+      return res.status(400).json({ success: false, message: 'Validation failed', errors: errors.array() });
     }
 
     const { email, password } = req.body;
 
-    // Check if user exists and get password
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+    const user = await User.findOne({ email: email.toLowerCase() }).select(
+      '+password +loginAttempts +lockUntil'
+    );
 
     if (!user) {
-      return res.status(401).json({
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    // ── Account lock check ──────────────────────────────────
+    if (user.lockUntil && user.lockUntil > new Date()) {
+      const minutesLeft = Math.ceil((user.lockUntil - Date.now()) / 60000);
+      return res.status(423).json({
         success: false,
-        message: 'Invalid email or password'
+        code:    'ACCOUNT_LOCKED',
+        message: `Account locked due to too many failed attempts. Try again in ${minutesLeft} minute(s).`,
       });
     }
 
-    // Check password
-    const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) {
+    // ── Password check ──────────────────────────────────────
+    const isValid = await user.comparePassword(password);
+
+    if (!isValid) {
+      // Increment failed attempts
+      user.loginAttempts = (user.loginAttempts || 0) + 1;
+
+      if (user.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
+        user.lockUntil     = new Date(Date.now() + LOCK_TIME_MINUTES * 60 * 1000);
+        user.loginAttempts = 0;
+        await user.save();
+        return res.status(423).json({
+          success: false,
+          code:    'ACCOUNT_LOCKED',
+          message: `Account locked for ${LOCK_TIME_MINUTES} minutes after ${MAX_LOGIN_ATTEMPTS} failed attempts.`,
+        });
+      }
+
+      await user.save();
+      const remaining = MAX_LOGIN_ATTEMPTS - user.loginAttempts;
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: `Invalid email or password. ${remaining} attempt(s) remaining before account lock.`,
       });
     }
 
-    // Check if user is active
+    // ── Success — reset attempt counter ─────────────────────
+    user.loginAttempts = 0;
+    user.lockUntil     = undefined;
+
     if (!user.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: 'Account is deactivated. Please contact support.'
-      });
+      return res.status(401).json({ success: false, message: 'Account deactivated. Contact support.' });
     }
 
-    // Generate tokens
-    const token = generateToken(user._id);
+    const token        = generateToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
-
-    // Save refresh token
     user.refreshTokens.push({ token: refreshToken });
     user.lastLogin = new Date();
     await user.save();
@@ -164,164 +149,101 @@ const login = async (req, res) => {
       message: 'Login successful',
       data: {
         user: {
-          id: user._id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          phone: user.phone,
-          role: user.role,
-          kycVerified: user.kycVerified,
-          profileComplete: user.profileComplete
+          id: user._id, email: user.email,
+          firstName: user.firstName, lastName: user.lastName,
+          phone: user.phone, role: user.role,
+          kycVerified: user.kycVerified, profileComplete: user.profileComplete,
         },
-        token,
-        refreshToken
-      }
+        token, refreshToken,
+      },
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Login failed. Please try again.'
-    });
+    console.error('login error:', error);
+    res.status(500).json({ success: false, message: 'Login failed. Please try again.' });
   }
 };
 
-// @desc    Verify OTP
-// @route   POST /api/auth/verify-otp
-// @access  Public
+// ── Verify OTP ────────────────────────────────────────────────
 const verifyOTP = async (req, res) => {
   try {
     const { email, otp } = req.body;
-
     const user = await User.findOne({ email: email.toLowerCase() });
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (!user.otp?.code) return res.status(400).json({ success: false, message: 'No OTP found. Request a new one.' });
+    if (user.otp.expiresAt < new Date()) return res.status(400).json({ success: false, message: 'OTP has expired. Request a new one.' });
+    if (user.otp.code !== otp) return res.status(400).json({ success: false, message: 'Invalid OTP' });
 
-    if (!user.otp || !user.otp.code) {
-      return res.status(400).json({
-        success: false,
-        message: 'No OTP found. Please request a new one.'
-      });
-    }
-
-    if (user.otp.expiresAt < new Date()) {
-      return res.status(400).json({
-        success: false,
-        message: 'OTP has expired. Please request a new one.'
-      });
-    }
-
-    if (user.otp.code !== otp) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid OTP'
-      });
-    }
-
-    // Clear OTP and mark as verified
     user.otp = undefined;
     await user.save();
 
-    res.json({
-      success: true,
-      message: 'OTP verified successfully'
-    });
+    res.json({ success: true, message: 'Email verified successfully.' });
   } catch (error) {
-    console.error('OTP verification error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'OTP verification failed'
-    });
+    console.error('verifyOTP error:', error);
+    res.status(500).json({ success: false, message: 'OTP verification failed' });
   }
 };
 
-// @desc    Refresh token
-// @route   POST /api/auth/refresh
-// @access  Public
+// ── Resend OTP ────────────────────────────────────────────────
+const resendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email: email?.toLowerCase() });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const otp = generateOTP();
+    user.otp  = { code: otp, expiresAt: new Date(Date.now() + 10 * 60 * 1000) };
+    await user.save();
+
+    await sendOTPEmail(user.email, otp);
+    res.json({ success: true, message: 'OTP sent. Please check your email.' });
+  } catch (error) {
+    console.error('resendOTP error:', error);
+    res.status(500).json({ success: false, message: 'Failed to resend OTP' });
+  }
+};
+
+// ── Refresh Token ─────────────────────────────────────────────
 const refreshToken = async (req, res) => {
   try {
     const { refreshToken } = req.body;
+    if (!refreshToken) return res.status(401).json({ success: false, message: 'Refresh token required' });
 
-    if (!refreshToken) {
-      return res.status(401).json({
-        success: false,
-        message: 'Refresh token required'
-      });
-    }
-
-    // Verify refresh token
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const user    = await User.findById(decoded.userId);
 
-    // Check if refresh token exists in user's tokens
-    const user = await User.findById(decoded.userId);
-    if (!user || !user.refreshTokens.some(token => token.token === refreshToken)) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid refresh token'
-      });
+    if (!user || !user.refreshTokens.some(t => t.token === refreshToken)) {
+      return res.status(401).json({ success: false, message: 'Invalid refresh token' });
     }
 
-    // Generate new tokens
-    const newToken = generateToken(user._id);
+    // Rotate — remove old, add new
+    user.refreshTokens = user.refreshTokens.filter(t => t.token !== refreshToken);
+    const newToken        = generateToken(user._id);
     const newRefreshToken = generateRefreshToken(user._id);
-
-    // Replace old refresh token
-    user.refreshTokens = user.refreshTokens.filter(token => token.token !== refreshToken);
     user.refreshTokens.push({ token: newRefreshToken });
     await user.save();
 
-    res.json({
-      success: true,
-      data: {
-        token: newToken,
-        refreshToken: newRefreshToken
-      }
-    });
+    res.json({ success: true, data: { token: newToken, refreshToken: newRefreshToken } });
   } catch (error) {
-    console.error('Token refresh error:', error);
-    res.status(401).json({
-      success: false,
-      message: 'Invalid refresh token'
-    });
+    res.status(401).json({ success: false, message: 'Invalid refresh token' });
   }
 };
 
-// @desc    Logout user
-// @route   POST /api/auth/logout
-// @access  Private
+// ── Logout ────────────────────────────────────────────────────
 const logout = async (req, res) => {
   try {
     const { refreshToken } = req.body;
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user._id);
 
     if (user && refreshToken) {
-      // Remove the refresh token
-      user.refreshTokens = user.refreshTokens.filter(token => token.token !== refreshToken);
+      user.refreshTokens = user.refreshTokens.filter(t => t.token !== refreshToken);
       await user.save();
     }
 
-    res.json({
-      success: true,
-      message: 'Logged out successfully'
-    });
+    res.json({ success: true, message: 'Logged out successfully' });
   } catch (error) {
-    console.error('Logout error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Logout failed'
-    });
+    res.status(500).json({ success: false, message: 'Logout failed' });
   }
 };
 
-module.exports = {
-  register,
-  login,
-  verifyOTP,
-  refreshToken,
-  logout
-};
+module.exports = { register, login, verifyOTP, resendOTP, refreshToken, logout };

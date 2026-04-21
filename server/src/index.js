@@ -1,78 +1,82 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+const cors    = require('cors');
+const helmet  = require('helmet');
 const connectDB = require('./config/database');
-const authRoutes = require('./routes/auth');
-const userRoutes = require('./routes/users');
-const policyRoutes = require('./routes/policies');
-const claimRoutes = require('./routes/claims');
+const authRoutes    = require('./routes/auth');
+const userRoutes    = require('./routes/users');
+const policyRoutes  = require('./routes/policies');
+const claimRoutes   = require('./routes/claims');
 const paymentRoutes = require('./routes/payments');
-const { errorHandler } = require('./middleware/errorHandler');
+const { errorHandler }    = require('./middleware/errorHandler');
+const { generalLimiter, sanitizeResponse } = require('./middleware/security');
 
-const app = express();
+const app  = express();
 const PORT = process.env.PORT || 5003;
 
-// Connect to MongoDB
 connectDB();
 
-// Security middleware
+// ── Security headers ──────────────────────────────────────────
 app.use(helmet());
 
-// CORS configuration - allow all localhost ports in development
-const corsOptions = {
-  credentials: true
-};
-
+// ── CORS ──────────────────────────────────────────────────────
+const corsOptions = { credentials: true };
 if (process.env.NODE_ENV === 'production') {
   corsOptions.origin = process.env.CLIENT_URL;
 } else {
-  // In development, allow all localhost origins
-  corsOptions.origin = function (origin, callback) {
-    const allowedHosts = ['localhost', '127.0.0.1'];
-    const isAllowed = !origin || allowedHosts.some(host => origin.includes(host));
-    callback(null, isAllowed);
+  corsOptions.origin = (origin, cb) => {
+    const ok = !origin || ['localhost', '127.0.0.1'].some(h => origin.includes(h));
+    cb(null, ok);
   };
 }
-
 app.use(cors(corsOptions));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
-});
-app.use('/api/', limiter);
+// ── Global rate limit ─────────────────────────────────────────
+app.use('/api/', generalLimiter);
 
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
+// ── Body parsing ──────────────────────────────────────────────
+app.use((req, res, next) => {
+  if (req.originalUrl === '/api/payments/webhook') {
+    let raw = '';
+    req.on('data', c => { raw += c.toString(); });
+    req.on('end', () => {
+      req.rawBody = raw;
+      try { req.body = JSON.parse(raw); } catch { req.body = {}; }
+      next();
+    });
+  } else {
+    express.json({ limit: '10mb' })(req, res, next);
+  }
+});
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Health check
+// ── Strip sensitive fields from all responses ─────────────────
+app.use(sanitizeResponse);
+
+// ── Health check ──────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
+// ── API routes ────────────────────────────────────────────────
+app.use('/api/auth',     authRoutes);
+app.use('/api/users',    userRoutes);
 app.use('/api/policies', policyRoutes);
-app.use('/api/claims', claimRoutes);
+app.use('/api/claims',   claimRoutes);
 app.use('/api/payments', paymentRoutes);
 
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ message: 'Route not found' });
+// ── 404 handler ───────────────────────────────────────────────
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: 'Route not found' });
 });
 
-// Error handling middleware
+// ── Error handler ─────────────────────────────────────────────
 app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📱 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
+  console.log(`🔒 Security middleware active`);
 });
 
 module.exports = app;

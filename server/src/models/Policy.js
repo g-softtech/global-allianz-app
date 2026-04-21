@@ -118,7 +118,6 @@ const policySchema = new mongoose.Schema({
 
 // ── Indexes ──────────────────────────────────────────────────
 policySchema.index({ user: 1, status: 1 });
-policySchema.index({ policyNumber: 1 });
 policySchema.index({ type: 1 });
 policySchema.index({ endDate: 1 });
 
