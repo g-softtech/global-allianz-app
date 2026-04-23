@@ -4,8 +4,7 @@ import { useAuthStore } from "../store/authStore";
 export default function ProtectedRoute({ children }) {
   const { isAuthenticated, isReady, user } = useAuthStore();
 
-  // Wait for AuthRehydrator to finish before making any redirect decisions
-  // This prevents the flash of customer content before admin redirect
+  // Wait for rehydration before any redirect
   if (!isReady) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-white">
@@ -16,8 +15,8 @@ export default function ProtectedRoute({ children }) {
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
-  // Admins must not access customer pages
-  if (user?.role === 'admin') return <Navigate to="/admin" replace />;
+  // Admin must not access customer pages
+  if (user?.role === "admin") return <Navigate to="/admin" replace />;
 
   return children;
 }
