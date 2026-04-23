@@ -14,7 +14,7 @@ const createTransporter = () => {
       rejectUnauthorized: false, // allow self-signed certs in dev
     },
   };
-  return nodemailer.createTransporter(config);
+  return nodemailer.CreateTransporter(config);
 };
 
 // ── Test SMTP connection on startup ───────────────────────────
