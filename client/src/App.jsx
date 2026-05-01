@@ -11,6 +11,8 @@ import TermsPage           from "./pages/TermsPage";
 import LoginPage           from "./pages/auth/LoginPage";
 import RegisterPage        from "./pages/auth/RegisterPage";
 import VerifyOTPPage       from "./pages/auth/VerifyOTPPage";
+import ForgotPasswordPage  from "./pages/auth/ForgotPasswordPage";
+import ResetPasswordPage   from "./pages/auth/ResetPasswordPage";
 import DashboardPage       from "./pages/DashboardPage";
 import ProfilePage         from "./pages/ProfilePage";
 import BuyPolicyPage       from "./pages/BuyPolicyPage";
@@ -42,29 +44,21 @@ function AuthRehydrator() {
   const { token, user, updateUser, logout, setReady, sessionType } = useAuthStore();
 
   useEffect(() => {
-    // No token — nothing to do, immediately ready
-    if (!token) {
-      setReady(true);
-      return;
-    }
+    if (!token) { setReady(true); return; }
 
-    // We already have the user cached from localStorage — ready immediately
-    // Still fetch in background to refresh data, but don't block rendering
+    // Already have user cached — set ready immediately, refresh in background
     if (user) {
       setReady(true);
-      // Background refresh (non-blocking — failures are silent)
       apiClient.get("/users/me")
         .then((res) => {
           const fresh = res.data.data;
-          // Only update if role matches — don't logout on mismatch here
-          // since we already set isReady=true and rendered the page
           if (fresh.role === user.role) updateUser(fresh);
         })
-        .catch(() => {}); // silent — cached user is still valid
+        .catch(() => {});
       return;
     }
 
-    // Token exists but no cached user — must fetch before rendering
+    // No cached user — must fetch before rendering
     const fetchUser = (retryCount = 0) => {
       apiClient.get("/users/me")
         .then((res) => {
@@ -78,13 +72,10 @@ function AuthRehydrator() {
         })
         .catch((err) => {
           const status = err?.response?.status;
-          if (status === 401) {
-            logout();
-            setReady(true);
-          } else if (status === 429 && retryCount < 3) {
+          if (status === 401) { logout(); setReady(true); }
+          else if (status === 429 && retryCount < 3) {
             setTimeout(() => fetchUser(retryCount + 1), 1500);
           } else {
-            // Unknown error — set ready without user, routes will redirect to login
             setReady(true);
           }
         });
@@ -110,10 +101,12 @@ function AppRoutes() {
         <Route path="/privacy"  element={<MainLayout><PrivacyPage  /></MainLayout>} />
         <Route path="/terms"    element={<MainLayout><TermsPage    /></MainLayout>} />
 
-        {/* Customer Auth */}
-        <Route path="/login"       element={<MainLayout><LoginPage     /></MainLayout>} />
-        <Route path="/register"    element={<MainLayout><RegisterPage  /></MainLayout>} />
-        <Route path="/verify-otp"  element={<MainLayout><VerifyOTPPage /></MainLayout>} />
+        {/* Auth */}
+        <Route path="/login"            element={<MainLayout><LoginPage          /></MainLayout>} />
+        <Route path="/register"         element={<MainLayout><RegisterPage       /></MainLayout>} />
+        <Route path="/verify-otp"       element={<MainLayout><VerifyOTPPage      /></MainLayout>} />
+        <Route path="/forgot-password"  element={<MainLayout><ForgotPasswordPage /></MainLayout>} />
+        <Route path="/reset-password"   element={<MainLayout><ResetPasswordPage  /></MainLayout>} />
 
         {/* Customer Protected */}
         <Route path="/dashboard"        element={<ProtectedRoute><MainLayout><DashboardPage       /></MainLayout></ProtectedRoute>} />
@@ -124,10 +117,8 @@ function AppRoutes() {
         <Route path="/payments"         element={<ProtectedRoute><MainLayout><PaymentHistoryPage  /></MainLayout></ProtectedRoute>} />
         <Route path="/claims/new"       element={<ProtectedRoute><MainLayout><FileClaimPage       /></MainLayout></ProtectedRoute>} />
 
-        {/* Admin Auth */}
+        {/* Admin */}
         <Route path="/admin/login" element={<AdminLoginPage />} />
-
-        {/* Admin Panel */}
         <Route path="/admin"          element={<AdminRoute><AdminLayout><AdminDashboard /></AdminLayout></AdminRoute>} />
         <Route path="/admin/users"    element={<AdminRoute><AdminLayout><AdminUsers     /></AdminLayout></AdminRoute>} />
         <Route path="/admin/policies" element={<AdminRoute><AdminLayout><AdminPolicies  /></AdminLayout></AdminRoute>} />
@@ -143,9 +134,5 @@ function AppRoutes() {
 }
 
 export default function App() {
-  return (
-    <Router>
-      <AppRoutes />
-    </Router>
-  );
+  return <Router><AppRoutes /></Router>;
 }

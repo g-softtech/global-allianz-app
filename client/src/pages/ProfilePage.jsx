@@ -169,36 +169,72 @@ export default function ProfilePage() {
     setKycFiles((p) => ({ ...p, [docId]: file }));
   };
 
-  const submitKYC = async () => {
-    if (Object.keys(kycFiles).length === 0) {
-      showFeedback("Please upload at least one document.", true);
+const submitKYC = async () => {
+  if (Object.keys(kycFiles).length === 0) {
+    showFeedback("Please upload at least one document.", true);
+    return;
+  }
+
+  // NIN required if id_card is being submitted
+  if (kycFiles["id_card"]) {
+    if (!nin || nin.trim() === "") {
+      showFeedback("NIN (11 digits) is required when submitting a National ID Card.", true);
       return;
     }
-    setSaving(true);
-    try {
-      // Build document list with metadata
-      const documents = Object.entries(kycFiles).map(([type, file]) => ({
-        type,
-        fileName: file.name,
-        fileSize: file.size,
-        mimeType: file.type,
-        url:      'pending_upload',
-      }));
-
-      await apiClient.post("/users/kyc", { documents, nin: nin || undefined });
-      setKycSuccess("Documents submitted! Our compliance team will verify within 24–48 hours. You will be notified by email.");
-      setKycFiles({});
-    } catch (err) {
-      const errors = err.response?.data?.errors;
-      if (errors?.length > 0) {
-        showFeedback(errors.join(' | '), true);
-      } else {
-        showFeedback(err.response?.data?.message || "Failed to submit documents.", true);
-      }
-    } finally {
-      setSaving(false);
+    if (!/^\d{11}$/.test(nin.trim())) {
+      showFeedback("NIN must be exactly 11 digits — no spaces or letters.", true);
+      return;
     }
-  };
+  }
+
+  setSaving(true);
+  try {
+    // Convert each file to base64 for upload
+    const documents = await Promise.all(
+      Object.entries(kycFiles).map(async ([type, file]) => {
+        // Read file as base64
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload  = () => resolve(reader.result); // includes data:mime;base64, prefix
+          reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+          reader.readAsDataURL(file);
+        });
+
+        return {
+          type,
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: file.type,
+          fileData: base64, // ← Cloudinary upload
+          url:      "pending_upload",
+        };
+      })
+    );
+
+    await apiClient.post("/users/kyc", {
+      documents,
+      nin: nin.trim() || undefined,
+    });
+
+    setKycSuccess(
+      "Documents submitted successfully! Our compliance team will review within 24–48 hours. You will receive an email once verified."
+    );
+    setKycFiles({});
+    setKycUploads({});
+    setNin("");
+
+  } catch (err) {
+    const errors = err.response?.data?.errors;
+    if (errors?.length > 0) {
+      showFeedback(errors.join(" | "), true);
+    } else {
+      showFeedback(err.response?.data?.message || "Failed to submit documents. Please try again.", true);
+    }
+  } finally {
+    setSaving(false);
+  }
+};
+
 
   const inputCls = "input-field";
   const labelCls = "form-label";
