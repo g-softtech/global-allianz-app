@@ -164,7 +164,7 @@ export default function DashboardPage() {
               </h1>
               <p className="font-sans text-gray-400 text-sm mt-1">
                 Account ID: <span className="text-gray-300 font-medium">
-                  {String(user?._id || user?.id || '').slice(-8).toUpperCase() || "GAIB-XXXX"}
+                  {(user?._id || user?.id)?.toString().slice(-8).toUpperCase() || "GAIB-XXXX"}
                 </span>
                 {" · "}
                 <span className="capitalize">{user?.role || "Customer"}</span>
